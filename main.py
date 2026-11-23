@@ -21,8 +21,10 @@ SENSOR_COLOR = (0, 120, 255)
 FPS = 60                         # loop runs 60 times per second
 TURN_RATE = 4.0                  # degrees per frame at full steer
 START = (450, 115, 0)
-SENSOR_ANGLES = [-30, 30]
-SENSOR_DISTANCE = 25            # x, y, heading
+SENSOR_ANGLES = [-40, -20, 0, 20, 40]
+SENSOR_DISTANCE = 25
+KP = 0.03
+last_steer = 0.0             # x, y, heading
 
 
 class Car:
@@ -96,8 +98,21 @@ def read_sensors(car, track):
 # ---------------- THINK ----------------
 def brain(readings):
     """Turn the sensor readings into a steering value from -1.0 to +1.0."""
-    # TODO Step 9
-    return 0.0
+    global last_steer
+
+    left = readings[0]
+    right = readings[4]
+
+    if left and not right:
+        last_steer = -1.0
+
+    elif right and not left:
+        last_steer = 1.0
+
+    elif left and right:
+        last_steer = 0.0
+
+    return last_steer
 
 
 # ---------------- Manual driving ----------------
@@ -137,6 +152,9 @@ def main():
     autopilot = False
     frames_off_line = 0
     steer = 0.0
+    wobble = 0.0
+    prev_steer = 0.0
+    frames = 0
 
     running = True
 
@@ -163,9 +181,12 @@ def main():
                     frames_off_line = 0
 
         readings = read_sensors(car, track)  # SENSE
-        print(readings)
+
         steer = brain(readings) if autopilot else keyboard_steer()  # THINK
-        car.move(steer)  # ACT
+        car.move(steer)
+        wobble += abs(steer - prev_steer)
+        prev_steer = steer
+        frames += 1  # ACT
 
         if not on_line(track, car.x, car.y):
             frames_off_line += 1
@@ -179,8 +200,7 @@ def main():
             )
 
         mode = "AUTOPILOT" if autopilot else "MANUAL"
-        text = f"{mode}   steer {steer:+.2f}   frames off line: {frames_off_line}"
-
+        text = f"{mode}  steer {steer:+.2f}  frames off line: {frames_off_line}  wobble: {wobble / frames:.2f}"
         screen.blit(font.render(text, True, (20, 20, 20)), (12, 12))
         screen.blit(
             font.render(
