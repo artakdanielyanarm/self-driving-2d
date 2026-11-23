@@ -23,8 +23,9 @@ TURN_RATE = 4.0                  # degrees per frame at full steer
 START = (450, 115, 0)
 SENSOR_ANGLES = [-40, -20, 0, 20, 40]
 SENSOR_DISTANCE = 25
-KP = 0.03
-last_steer = 0.0             # x, y, heading
+KP = 0.05
+last_steer = 0.0
+last_error = 0.0             # x, y, heading
 
 
 class Car:
@@ -97,20 +98,20 @@ def read_sensors(car, track):
 
 # ---------------- THINK ----------------
 def brain(readings):
-    """Turn the sensor readings into a steering value from -1.0 to +1.0."""
-    global last_steer
+    """Use proportional control to follow the line."""
+    global last_steer, last_error
+    visible_angles = []
 
-    left = readings[0]
-    right = readings[4]
+    for angle, reading in zip(SENSOR_ANGLES, readings):
+        if reading:
+            visible_angles.append(angle)
 
-    if left and not right:
-        last_steer = -1.0
+    if not visible_angles:
+        return last_steer
 
-    elif right and not left:
-        last_steer = 1.0
-
-    elif left and right:
-        last_steer = 0.0
+    error = sum(visible_angles) / len(visible_angles)
+    last_error = error
+    last_steer = KP * error
 
     return last_steer
 
@@ -157,7 +158,7 @@ def main():
     frames = 0
 
     running = True
-
+    lost_line_frames = 0
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -179,10 +180,23 @@ def main():
                 elif event.key == pygame.K_r:
                     car = Car(*START)
                     frames_off_line = 0
+                    lost_line_frames = 0
 
         readings = read_sensors(car, track)  # SENSE
+        if autopilot and not any(readings):
+            lost_line_frames += 1
+        else:
+            lost_line_frames = 0
+
+        if lost_line_frames >= 30:
+            car.speed = 0
 
         steer = brain(readings) if autopilot else keyboard_steer()  # THINK
+        if autopilot:
+            car.speed = max(3.0, 8.0 - abs(last_error) * 0.125)
+
+        if lost_line_frames >= 30:
+            car.speed = 0
         car.move(steer)
         wobble += abs(steer - prev_steer)
         prev_steer = steer
@@ -200,7 +214,10 @@ def main():
             )
 
         mode = "AUTOPILOT" if autopilot else "MANUAL"
-        text = f"{mode}  steer {steer:+.2f}  frames off line: {frames_off_line}  wobble: {wobble / frames:.2f}"
+        if lost_line_frames >= 30:
+            text = "LINE LOST: STOPPED"
+        else:
+            text = f"{mode}  steer {steer:+.2f}  frames off line: {frames_off_line}  wobble: {wobble / frames:.2f}"
         screen.blit(font.render(text, True, (20, 20, 20)), (12, 12))
         screen.blit(
             font.render(

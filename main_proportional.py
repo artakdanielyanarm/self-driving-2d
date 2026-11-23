@@ -200,7 +200,10 @@ def main():
             )
 
         mode = "AUTOPILOT" if autopilot else "MANUAL"
-        text = f"{mode}  steer {steer:+.2f}  frames off line: {frames_off_line}  wobble: {wobble / frames:.2f}"
+        if lost_line_frames >= 30:
+               text = "LINE LOST: STOPPED"
+        else:
+            text = f"{mode}  steer {steer:+.2f}  frames off line: {frames_off_line}  wobble: {wobble / frames:.2f}"
         screen.blit(font.render(text, True, (20, 20, 20)), (12, 12))
         screen.blit(
             font.render(
