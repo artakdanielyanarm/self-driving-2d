@@ -20,7 +20,9 @@ CAR_COLOR = (220, 60, 50)
 SENSOR_COLOR = (0, 120, 255)
 FPS = 60                         # loop runs 60 times per second
 TURN_RATE = 4.0                  # degrees per frame at full steer
-START = (450, 115, 0)            # x, y, heading
+START = (450, 115, 0)
+SENSOR_ANGLES = [-30, 30]
+SENSOR_DISTANCE = 25            # x, y, heading
 
 
 class Car:
@@ -68,14 +70,27 @@ def make_track():
 # ---------------- SENSE ----------------
 def sensor_points(car):
     """Return a list of (x, y) points just ahead of the car."""
-    # TODO Step 8
-    return []
+    points = []
+
+    for angle in SENSOR_ANGLES:
+        rad = math.radians(car.heading + angle)
+
+        sx = car.x + math.cos(rad) * SENSOR_DISTANCE
+        sy = car.y + math.sin(rad) * SENSOR_DISTANCE
+
+        points.append((sx, sy))
+
+    return points
 
 
 def read_sensors(car, track):
     """Return one True/False per sensor point: is it on the dark line?"""
-    # TODO Step 8
-    return []
+    readings = []
+
+    for x, y in sensor_points(car):
+        readings.append(on_line(track, x, y))
+
+    return readings
 
 
 # ---------------- THINK ----------------
@@ -148,6 +163,7 @@ def main():
                     frames_off_line = 0
 
         readings = read_sensors(car, track)  # SENSE
+        print(readings)
         steer = brain(readings) if autopilot else keyboard_steer()  # THINK
         car.move(steer)  # ACT
 
